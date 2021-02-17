@@ -11,9 +11,11 @@ spec:
     kind: GroupSync
     listKind: GroupSyncList
     plural: groupsyncs
+    shortNames:
+    - gs
     singular: groupsync
   preserveUnknownFields: false
-  scope: Namespaced
+  scope: Cluster
   subresources:
     status: {}
   validation:

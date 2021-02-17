@@ -64,7 +64,7 @@ type GroupSyncStatus struct {
 
 // GroupSync is the Schema for the groupsyncs API
 // +operator-sdk:csv:customresourcedefinitions:displayName="Group Sync"
-// +kubebuilder:resource:path=groupsyncs,scope=Namespaced
+// +kubebuilder:resource:path=groupsyncs,scope="Cluster",shortName=gs
 type GroupSync struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
