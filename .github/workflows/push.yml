@@ -319,7 +319,7 @@ jobs:
           TAGS_TO_DIGESTS: ${OPERATOR_IMAGE_TAG}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
+        uses: peter-evans/create-pull-request@v4.0.1
         if: ${{ startsWith( env.first_release, 'true' ) }}
         with:
           path: ./tmp/community-operators-prod
@@ -370,7 +370,7 @@ jobs:
           token: ${{ secrets.COMMUNITY_OPERATOR_PAT }}
 
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v3
+        uses: peter-evans/create-pull-request@v4.0.1
         if: ${{ ! startsWith( env.first_release, 'true' ) }}
         with:
           path: ./tmp/community-operators-prod
