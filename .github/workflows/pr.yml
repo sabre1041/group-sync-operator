@@ -19,7 +19,7 @@ jobs:
           echo "QUAY_REGISTRY=${QUAY_REGISTRY:-$DEFAULT_QUAY_REGISTRY}" |tee -a $GITHUB_ENV
 
       - name: Set up Go 1.x
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v3
         with:
           go-version: ^1.16
       - name: Check out code into the Go module directory
