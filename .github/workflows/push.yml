@@ -26,7 +26,7 @@ jobs:
         with:
           go-version: ^1.16
       - name: Check out code into the Go module directory
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
 
       - name: Download operator sdk
         shell: bash
@@ -171,7 +171,7 @@ jobs:
           echo "QUAY_REGISTRY=${QUAY_REGISTRY:-$DEFAULT_QUAY_REGISTRY}" |tee -a $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
 
       - name: Download compatible Helm version
         shell: bash
@@ -192,7 +192,7 @@ jobs:
           git config --global user.name "$GITHUB_ACTOR"
           git config --global user.email "$GITHUB_ACTOR@users.noreply.github.com"
       - name: checkout gh-pages
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
         with:
           path: ./tmp/gh-pages
           ref: gh-pages
@@ -217,7 +217,7 @@ jobs:
           echo "REPOSITORY_NAME=$(basename $GITHUB_REPOSITORY)" |tee -a $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
       - run: |
           git fetch --prune --unshallow
       - name: Get the version
@@ -259,7 +259,7 @@ jobs:
           echo "QUAY_REGISTRY=${QUAY_REGISTRY:-$DEFAULT_QUAY_REGISTRY}" |tee -a $GITHUB_ENV
 
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
       - name: Set up Go 1.x
         uses: actions/setup-go@v2
         with:
@@ -290,7 +290,7 @@ jobs:
           echo "VERSION=${TAG:1}" |tee -a $GITHUB_ENV
 
       - name: checkout community-operators-prod
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3.1.0
         with:
           repository: redhat-openshift-ecosystem/community-operators-prod
           path: ./tmp/community-operators-prod
