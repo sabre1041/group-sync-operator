@@ -27,6 +27,7 @@ import (
 	utilerrors "k8s.io/apimachinery/pkg/util/errors"
 	logf "sigs.k8s.io/controller-runtime/pkg/log"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	az "github.com/microsoft/kiota-authentication-azure-go"
@@ -50,6 +51,7 @@ const (
 	TenantID               = "AZURE_TENANT_ID"
 	ClientID               = "AZURE_CLIENT_ID"
 	ClientSecret           = "AZURE_CLIENT_SECRET"
+	FederatedTokenFile     = "AZURE_FEDERATED_TOKEN_FILE"
 	GraphGroupType         = "#microsoft.graph.group"
 	GraphUserType          = "#microsoft.graph.user"
 	GraphOdataType         = "@odata.type"
@@ -87,24 +89,32 @@ func (a *AzureSyncer) Validate() error {
 
 	validationErrors := []error{}
 
-	credentialsSecret := &corev1.Secret{}
-	err := a.ReconcilerBase.GetClient().Get(a.Context, types.NamespacedName{Name: a.Provider.CredentialsSecret.Name, Namespace: a.Provider.CredentialsSecret.Namespace}, credentialsSecret)
+	if a.Provider.CredentialsSecret != nil {
+		credentialsSecret := &corev1.Secret{}
+		err := a.ReconcilerBase.GetClient().Get(a.Context, types.NamespacedName{Name: a.Provider.CredentialsSecret.Name, Namespace: a.Provider.CredentialsSecret.Namespace}, credentialsSecret)
 
-	if err != nil {
-		validationErrors = append(validationErrors, err)
-	} else {
-
-		// Check that provided secret contains required keys
-		_, tenantIDSecretFound := credentialsSecret.Data[TenantID]
-		_, clientIDSecretFound := credentialsSecret.Data[ClientID]
-		_, clientSecretSecretFound := credentialsSecret.Data[ClientSecret]
-
-		if !tenantIDSecretFound || !clientIDSecretFound || !clientSecretSecretFound {
-			validationErrors = append(validationErrors, fmt.Errorf("Could not find `AZURE_TENANT_ID` or `AZURE_CLIENT_ID` or `AZURE_CLIENT_SECRET` key in secret '%s' in namespace '%s'", a.Provider.CredentialsSecret.Name, a.Provider.CredentialsSecret.Namespace))
+		if err != nil {
+			validationErrors = append(validationErrors, err)
+		} else {
+			a.CredentialsSecret = credentialsSecret
 		}
+	}
 
-		a.CredentialsSecret = credentialsSecret
+	// Check that required values are available in the secret or as environment variables
+	_, tenantIDFound := getSecretOrEnvValue(a.CredentialsSecret, TenantID)
+	_, clientIDFound := getSecretOrEnvValue(a.CredentialsSecret, ClientID)
 
+	if !tenantIDFound || !clientIDFound {
+		validationErrors = append(validationErrors, fmt.Errorf("Could not find `AZURE_TENANT_ID` or `AZURE_CLIENT_ID` in secret or as environment variables"))
+	}
+
+	// When not using client secret auth, verify that the federated token file is available
+	_, hasClientSecret := getSecretOrEnvValue(a.CredentialsSecret, ClientSecret)
+	if !hasClientSecret {
+		_, hasTokenFile := getSecretOrEnvValue(a.CredentialsSecret, FederatedTokenFile)
+		if !hasTokenFile {
+			validationErrors = append(validationErrors, fmt.Errorf("Could not find `AZURE_CLIENT_SECRET` or `AZURE_FEDERATED_TOKEN_FILE` in secret or as environment variables"))
+		}
 	}
 
 	providerCaResource := determineFromDeprecatedObjectRef(a.Provider.Ca, a.Provider.CaSecret)
@@ -181,14 +191,33 @@ func (a *AzureSyncer) Bind() error {
 
 	}
 
-	opts := &azidentity.ClientSecretCredentialOptions{}
-	opts.Cloud.ActiveDirectoryAuthorityHost = getAuthorityHost(a.Provider.AuthorityHost)
-	opts.Transport = &nethttp.Client{
+	var cred azcore.TokenCredential
+	var err error
+
+	httpTransport := &nethttp.Client{
 		Transport: defaultTransport,
 	}
-	cred, err := azidentity.NewClientSecretCredential(
-		string(a.CredentialsSecret.Data[TenantID]), string(a.CredentialsSecret.Data[ClientID]), string(a.CredentialsSecret.Data[ClientSecret]),
-		opts)
+
+	tenantID, _ := getSecretOrEnvValue(a.CredentialsSecret, TenantID)
+	clientID, _ := getSecretOrEnvValue(a.CredentialsSecret, ClientID)
+	clientSecret, hasClientSecret := getSecretOrEnvValue(a.CredentialsSecret, ClientSecret)
+
+	if hasClientSecret {
+		opts := &azidentity.ClientSecretCredentialOptions{}
+		opts.Cloud.ActiveDirectoryAuthorityHost = getAuthorityHost(a.Provider.AuthorityHost)
+		opts.Transport = httpTransport
+		cred, err = azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, opts)
+	} else {
+		opts := &azidentity.WorkloadIdentityCredentialOptions{}
+		opts.Cloud.ActiveDirectoryAuthorityHost = getAuthorityHost(a.Provider.AuthorityHost)
+		opts.Transport = httpTransport
+		opts.TenantID = tenantID
+		opts.ClientID = clientID
+		if tokenFilePath, ok := getSecretOrEnvValue(a.CredentialsSecret, FederatedTokenFile); ok {
+			opts.TokenFilePath = tokenFilePath
+		}
+		cred, err = azidentity.NewWorkloadIdentityCredential(opts)
+	}
 
 	if err != nil {
 		return err

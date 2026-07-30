@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"fmt"
+	"os"
 
 	userv1 "github.com/openshift/api/user/v1"
 	redhatcopv1alpha1 "github.com/redhat-cop/group-sync-operator/api/v1alpha1"
@@ -195,4 +196,16 @@ func determineFromDeprecatedObjectRef(objectRef *redhatcopv1alpha1.ObjectRef, de
 
 	return deprecatedObjectRef
 
+}
+
+func getSecretOrEnvValue(secret *corev1.Secret, key string) (string, bool) {
+	if val, ok := os.LookupEnv(key); ok {
+		return val, true
+	}
+	if secret != nil {
+		if val, ok := secret.Data[key]; ok {
+			return string(val), true
+		}
+	}
+	return "", false
 }
